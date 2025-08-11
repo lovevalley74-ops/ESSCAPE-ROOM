@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>오래된 서재의 비밀 - 방탈출 게임</title>
+    
+    <!-- CSS 스타일 -->
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
+            background-color: #000;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .background-image {
+            width: 100%;
+            height: 100%;
+            object-fit: contain; /* 이미지 비율을 유지하며 컨테이너에 맞춤 */
+        }
+
+        .clickable-object {
+            position: absolute;
+            cursor: pointer;
+            /* 개발 시 클릭 영역 확인용 테두리: border: 2px solid red; */
+            border-radius: 10px;
+            transition: background-color 0.3s;
+        }
+
+        .clickable-object:hover {
+            background-color: rgba(255, 255, 0, 0.3); /* 마우스를 올리면 노란색 반투명 효과 */
+        }
+
+        #hint-display {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 15px 25px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            z-index: 10;
+        }
+
+        #hint-display h2 {
+            margin: 0 0 10px 0;
+            font-size: 1.2em;
+        }
+
+        #password-hints {
+            margin: 0;
+            font-size: 2em;
+            letter-spacing: 10px;
+            font-family: 'Courier New', Courier, monospace;
+        }
+
+        /* 모달 스타일 */
+        .modal-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.6);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal-content {
+            background-color: #fefefe;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+            width: 90%;
+            max-width: 500px;
+            text-align: center;
+            position: relative;
+            animation: fadeIn 0.3s;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.9); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        .close-btn {
+            position: absolute;
+            top: 10px;
+            right: 20px;
+            font-size: 30px;
+            font-weight: bold;
+            color: #aaa;
+            cursor: pointer;
+        }
+
+        .close-btn:hover {
+            color: #333;
+        }
+
+        .modal-content h2 {
+            margin-top: 0;
+            color: #333;
+        }
+
+        .modal-content p {
+            line-height: 1.6;
+            font-size: 1.1em;
+            color: #555;
+        }
+
+        .modal-content input[type="text"] {
+            width: 80%;
+            padding: 10px;
+            margin-top: 15px;
+            font-size: 1em;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            text-align: center;
+        }
+
+        .modal-content button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+            margin-top: 20px;
+            transition: background-color 0.3s;
+        }
+
+        .modal-content button:hover {
+            background-color: #45a049;
+        }
+
+        .options .option-btn {
+            margin: 5px;
+        }
+
+        /* 유틸리티 클래스 */
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <!-- 게임 전체 컨테이너 -->
+    <div id="game-container">
+        <!-- 배경 이미지 (BG01.jpg 파일이 같은 폴더에 있어야 합니다) -->
+        <img src="BG01.jpg" alt="오래된 서재 배경" class="background-image">
+
+        <!-- 클릭 가능한 오브젝트들의 위치와 크기 설정 -->
+        <div class="clickable-object" id="obj-paper" style="top: 25%; left: 65%; width: 8%; height: 15%;"></div>
+        <div class="clickable-object" id="obj-map" style="top: 70%; left: 30%; width: 20%; height: 15%;"></div>
+        <div class="clickable-object" id="obj-books" style="top: 55%; left: 15%; width: 10%; height: 15%;"></div>
+        <div class="clickable-object" id="obj-clock" style="top: 10%; left: 12%; width: 10%; height: 18%;"></div>
+        <div class="clickable-object" id="obj-chest" style="bottom: 5%; right: 10%; width: 25%; height: 25%;"></div>
+
+        <!-- 힌트 표시 영역 -->
+        <div id="hint-display">
+            <h2>획득한 비밀번호</h2>
+            <p id="password-hints">? ? ? ?</p>
+        </div>
+    </div>
+
+    <!-- 모달창들 (초기에는 숨겨져 있음) -->
+    <!-- 퀴즈 1: 낡은 종이 -->
+    <div id="modal-paper" class="modal-container hidden">
+        <div class="modal-content">
+            <span class="close-btn">&times;</span>
+            <h2>낡은 종이의 퀴즈</h2>
+            <p>"나는 한 번 태어나면 죽을 때까지 계속 자란다. 나는 무엇일까?"</p>
+            <div class="options">
+                <button class="option-btn" data-answer="1">몸무게</button>
+                <button class="option-btn" data-answer="2">키</button>
+                <button class="option-btn" data-answer="3">나이</button>
+                <button class="option-btn" data-answer="4">IQ</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 퀴즈 2: 지도 -->
+    <div id="modal-map" class="modal-container hidden">
+        <div class="modal-content">
+            <span class="close-btn">&times;</span>
+            <h2>지도의 수수께끼</h2>
+            <p>"2-2는 얼마인가?"</p>
+            <input type="text" id="map-answer" placeholder="숫자를 입력하세요">
+            <button id="map-submit">확인</button>
+        </div>
+    </div>
+    
+    <!-- 퀴즈 3: 책 더미 -->
+    <div id="modal-books" class="modal-container hidden">
+        <div class="modal-content">
+            <span class="close-btn">&times;</span>
+            <h2>책 더미의 문제</h2>
+            <p>"이 서재에 있는 책꽂이는 5개, 각 책꽂이에 꽂힌 책은 10권이다. 그런데 폭풍으로 창문이 깨지면서 책 30권이 빗물에 젖어 버렸다. 젖지 않은 책 수의 '십의 자리' 숫자는 무엇인가?"</p>
+            <input type="text" id="books-answer" placeholder="숫자를 입력하세요">
+            <button id="books-submit">확인</button>
+        </div>
+    </div>
+
+    <!-- 퀴즈 4: 시계 -->
+    <div id="modal-clock" class="modal-container hidden">
+        <div class="modal-content">
+            <span class="close-btn">&times;</span>
+            <h2>멈춰버린 시계</h2>
+            <p>"시계는 8시 25분을 가리킨 채 멈춰있다. 시계의 긴 바늘이 가리키는 숫자는 무엇인가?"</p>
+            <input type="text" id="clock-answer" placeholder="숫자를 입력하세요">
+            <button id="clock-submit">확인</button>
+        </div>
+    </div>
+
+    <!-- 최종: 보물함 -->
+    <div id="modal-chest" class="modal-container hidden">
+        <div class="modal-content">
+            <span class="close-btn">&times;</span>
+            <h2>보물함</h2>
+            <p>비밀번호를 입력하여 보물함을 여세요.</p>
+            <input type="text" id="chest-password" maxlength="4" placeholder="네 자리 숫자">
+            <button id="chest-submit">열기</button>
+        </div>
+    </div>
+
+    <!-- 자바스크립트 로직 -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // 게임 상태를 저장하는 객체
+            const gameState = {
+                solvedPuzzles: {
+                    paper: false,
+                    map: false,
+                    books: false,
+                    clock: false,
+                },
+                passwordHints: ['?', '?', '?', '?']
+            };
+
+            // HTML 요소들을 변수에 저장
+            const hintDisplay = document.getElementById('password-hints');
+
+            const modals = {
+                paper: document.getElementById('modal-paper'),
+                map: document.getElementById('modal-map'),
+                books: document.getElementById('modal-books'),
+                clock: document.getElementById('modal-clock'),
+                chest: document.getElementById('modal-chest')
+            };
+
+            const objects = {
+                paper: document.getElementById('obj-paper'),
+                map: document.getElementById('obj-map'),
+                books: document.getElementById('obj-books'),
+                clock: document.getElementById('obj-clock'),
+                chest: document.getElementById('obj-chest')
+            };
+
+            // 힌트 UI를 업데이트하는 함수
+            const updateHints = () => {
+                hintDisplay.textContent = gameState.passwordHints.join(' ');
+            };
+
+            // 모달을 여는 함수
+            const openModal = (modal) => {
+                modal.classList.remove('hidden');
+            };
+
+            // 모달을 닫는 함수
+            const closeModal = (modal) => {
+                modal.classList.add('hidden');
+            };
+
+            // 모든 모달의 닫기(X) 버튼에 이벤트 리스너 추가
+            document.querySelectorAll('.close-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    closeModal(btn.closest('.modal-container'));
+                });
+            });
+            
+            // 모달 바깥 영역 클릭 시 닫기
+            Object.values(modals).forEach(modal => {
+                modal.addEventListener('click', (e) => {
+                    if (e.target === modal) {
+                        closeModal(modal);
+                    }
+                });
+            });
+
+            // 각 오브젝트에 클릭 이벤트 리스너 설정
+            objects.paper.addEventListener('click', () => {
+                if (!gameState.solvedPuzzles.paper) {
+                    openModal(modals.paper);
+                } else {
+                    alert('이미 해결한 문제다.');
+                }
+            });
+
+            objects.map.addEventListener('click', () => {
+                if (!gameState.solvedPuzzles.map) {
+                    openModal(modals.map);
+                } else {
+                    alert('이미 해결한 문제다.');
+                }
+            });
+            
+            objects.books.addEventListener('click', () => {
+                if (!gameState.solvedPuzzles.books) {
+                    openModal(modals.books);
+                } else {
+                    alert('이미 해결한 문제다.');
+                }
+            });
+
+            objects.clock.addEventListener('click', () => {
+                if (!gameState.solvedPuzzles.clock) {
+                    openModal(modals.clock);
+                } else {
+                    alert('이미 해결한 문제다.');
+                }
+            });
+
+            objects.chest.addEventListener('click', () => {
+                openModal(modals.chest);
+            });
+
+
+            // --- 각 퍼즐의 정답 처리 로직 ---
+
+            // 1. 낡은 종이 (선택지 퀴즈)
+            modals.paper.querySelectorAll('.option-btn').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    if (e.target.dataset.answer === '3') {
+                        alert('정답! 첫 번째 비밀번호는 [2]입니다.');
+                        gameState.passwordHints[0] = '2';
+                        gameState.solvedPuzzles.paper = true;
+                        updateHints();
+                        closeModal(modals.paper);
+                    } else {
+                        alert('틀렸습니다. 다시 생각해 보세요.');
+                    }
+                });
+            });
+
+            // 2. 지도 (텍스트 입력)
+            document.getElementById('map-submit').addEventListener('click', () => {
+                const answer = document.getElementById('map-answer').value;
+                if (answer.trim() === '0') {
+                    alert('정답! 두 번째 비밀번호는 [0]입니다.');
+                    gameState.passwordHints[1] = '0';
+                    gameState.solvedPuzzles.map = true;
+                    updateHints();
+                    closeModal(modals.map);
+                } else {
+                    alert('틀렸습니다. 지도를 잘 살펴보세요.');
+                }
+            });
+
+            // 3. 책 더미 (텍스트 입력)
+            document.getElementById('books-submit').addEventListener('click', () => {
+                const answer = document.getElementById('books-answer').value;
+                if (answer.trim() === '2') {
+                    alert('정답! 세 번째 비밀번호는 [2]입니다.');
+                    gameState.passwordHints[2] = '2';
+                    gameState.solvedPuzzles.books = true;
+                    updateHints();
+                    closeModal(modals.books);
+                } else {
+                    alert('틀렸습니다. 문제를 다시 읽어보세요.');
+                }
+            });
+
+
+            // 4. 시계 (텍스트 입력)
+            document.getElementById('clock-submit').addEventListener('click', () => {
+                const answer = document.getElementById('clock-answer').value;
+                if (answer.trim() === '5') {
+                    alert('정답! 네 번째 비밀번호는 [5]입니다.');
+                    gameState.passwordHints[3] = '5';
+                    gameState.solvedPuzzles.clock = true;
+                    updateHints();
+                    closeModal(modals.clock);
+                } else {
+                    alert('틀렸습니다. 긴 바늘이 가리키는 숫자를 보세요.');
+                }
+            });
+
+            // 최종. 보물함
+            document.getElementById('chest-submit').addEventListener('click', () => {
+                const password = document.getElementById('chest-password').value;
+                if (password === '2025') {
+                    // 모든 모달을 닫고 성공 메시지를 보여줌
+                    Object.values(modals).forEach(closeModal);
+                    // 잠시 후 alert를 띄워 배경을 볼 수 있게 함
+                    setTimeout(() => {
+                        alert('철컥-! 보물함이 열리며 안에서 낡은 문 열쇠가 나타났다.\n\n당신은 열쇠로 문을 열고 마침내 서재를 탈출했습니다! 🎉');
+                    }, 100);
+                } else {
+                    alert('비밀번호가 틀렸습니다.');
+                }
+            });
+
+            // 게임 시작 시 초기 힌트 표시
+            updateHints();
+        });
+    </script>
+</body>
+</html>
